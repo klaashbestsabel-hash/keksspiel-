@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Keksspiel</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      background: #3b2314;
+      color: #fff;
+      font-family: sans-serif;
+      text-align: center;
+      user-select: none;
+    }
+    h1 { margin: 10px 0; }
+    #zaehler { font-size: 32px; margin: 10px 0; }
+    #proSekunde { opacity: 0.8; margin-bottom: 20px; }
+    #keks {
+      font-size: 140px;
+      cursor: pointer;
+      display: inline-block;
+      transition: transform 0.05s;
+    }
+    #keks:active { transform: scale(0.9); }
+    .upgrade {
+      display: block;
+      width: 90%;
+      max-width: 400px;
+      margin: 10px auto;
+      padding: 14px;
+      font-size: 18px;
+      border: none;
+      border-radius: 10px;
+      background: #d9a05b;
+      color: #3b2314;
+    }
+    .upgrade:disabled { opacity: 0.4; }
+
+    #golden {
+      position: fixed;
+      font-size: 70px;
+      cursor: pointer;
+      display: none;
+      z-index: 50;
+      animation: puls 0.8s infinite alternate;
+    }
+    @keyframes puls {
+      from { transform: scale(0.9); }
+      to { transform: scale(1.15); }
+    }
+    #meldung {
+      position: fixed;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: gold;
+      color: #3b2314;
+      padding: 10px 18px;
+      border-radius: 10px;
+      font-weight: bold;
+      display: none;
+      z-index: 60;
+    }
+
+    #panel {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 230px;
+      height: 100%;
+      background: #1e1e1e;
+      border-right: 2px solid gold;
+      padding: 14px;
+      box-sizing: border-box;
+      text-align: left;
+      overflow-y: auto;
+      transform: translateX(-100%);
+      transition: transform 0.25s;
+      z-index: 40;
+    }
+    #panel.offen { transform: translateX(0); }
+    #panel h2 { margin-top: 0; color: gold; font-size: 20px; }
+    #panel button {
+      display: block;
+      width: 100%;
+      margin: 6px 0;
+      padding: 10px;
+      font-size: 15px;
+      border: none;
+      border-radius: 8px;
+      background: #444;
+      color: #fff;
+    }
+    #panel button:active { background: gold; color: #000; }
+
+    #codefeld {
+      position: fixed;
+      bottom: 10px;
+      right: 10px;
+      z-index: 30;
+    }
+    #codefeld input {
+      width: 110px;
+      padding: 6px;
+      font-size: 14px;
+      border-radius: 6px;
+      border: 1px solid #888;
+      background: #2a170c;
+      color: #fff;
+    }
+    #codefeld button {
+      padding: 6px 10px;
+      font-size: 14px;
+      border-radius: 6px;
+      border: none;
+      background: #d9a05b;
+      color: #3b2314;
+    }
+  </style>
+</head>
+<body>
+  <h1>Keksspiel</h1>
+  <div id="zaehler">0 Kekse</div>
+  <div id="proSekunde">0 Kekse pro Sekunde</div>
+  <div id="keks">🍪</div>
+
+  <button class="upgrade" id="u1"></button>
+  <button class="upgrade" id="u2"></button>
+  <button class="upgrade" id="u3"></button>
+
+  <div id="golden">🌟</div>
+  <div id="meldung"></div>
+
+  <div id="panel">
+    <h2>Admin-Panel</h2>
+    <button id="a1">+1.000 Kekse</button>
+    <button id="a2">+1 Million Kekse</button>
+    <button id="a3">Kekse mal 10</button>
+    <button id="a4">Kekse mal 1000</button>
+    <button id="a5">Goldener Keks erscheint</button>
+    <button id="a6">Lucky: große Belohnung</button>
+    <button id="a7">Produktion mal 10 (30 Sek.)</button>
+    <button id="a8">Alle Upgrades +10</button>
+    <button id="a9">Alles zurücksetzen</button>
+    <button id="a10">Panel schließen</button>
+  </div>
+
+  <div id="codefeld">
+    <input type="text" id="codeeingabe" placeholder="Code">
+    <button id="codeok">OK</button>
+  </div>
+
+  <script>
+    let kekse = 0;
+    let proKlick = 1;
+    let multiplikator = 1;
+
+    const upgrades = [
+      { name: "Stärkerer Klick", preis: 20, startpreis: 20, art: "klick", wert: 1, anzahl: 0 },
+      { name: "Oma", preis: 50, startpreis: 50, art: "auto", wert: 1, anzahl: 0 },
+      { name: "Backfabrik", preis: 300, startpreis: 300, art: "auto", wert: 8, anzahl: 0 }
+    ];
+
+    const zaehler = document.getElementById("zaehler");
+    const proSek = document.getElementById("proSekunde");
+    const meldung = document.getElementById("meldung");
+    const golden = document.getElementById("golden");
+    const panel = document.getElementById("panel");
+    const knoepfe = [
+      document.getElementById("u1"),
+      document.getElementById("u2"),
+      document.getElementById("u3")
+    ];
+
+    function kekseProSekunde() {
+      let summe = 0;
+      for (const u of upgrades) {
+        if (u.art === "auto") summe += u.anzahl * u.wert;
+      }
+      return summe * multiplikator;
+    }
+
+    function formatiere(zahl) {
+      zahl = Math.floor(zahl);
+      return zahl.toLocaleString("de-DE");
+    }
+
+    function anzeigen() {
+      zaehler.textContent = formatiere(kekse) + " Kekse";
+      proSek.textContent = formatiere(kekseProSekunde()) + " Kekse pro Sekunde";
+      upgrades.forEach((u, i) => {
+        knoepfe[i].textContent = u.name + " (" + u.anzahl + ") – Preis: " + formatiere(u.preis);
+        knoepfe[i].disabled = kekse < u.preis;
+      });
+    }
+
+    function zeigeMeldung(text) {
+      meldung.textContent = text;
+      meldung.style.display = "block";
+      setTimeout(() => { meldung.style.display = "none"; }, 2500);
+    }
+
+    document.getElementById("keks").addEventListener("click", () => {
+      kekse += proKlick * multiplikator;
+      anzeigen();
+    });
+
+    knoepfe.forEach((knopf, i) => {
+      knopf.addEventListener("click", () => {
+        const u = upgrades[i];
+        if (kekse >= u.preis) {
+          kekse -= u.preis;
+          u.anzahl += 1;
+          if (u.art === "klick") proKlick += u.wert;
+          u.preis = Math.ceil(u.preis * 1.15);
+          anzeigen();
+        }
+      });
+    });
+
+    setInterval(() => {
+      kekse += kekseProSekunde() / 10;
+      anzeigen();
+    }, 100);
+
+    function goldenZeigen() {
+      golden.style.left = (10 + Math.random() * 70) + "%";
+      golden.style.top = (20 + Math.random() * 60) + "%";
+      golden.style.display = "block";
+      clearTimeout(golden.timer);
+      golden.timer = setTimeout(() => { golden.style.display = "none"; }, 8000);
+    }
+
+    golden.addEventListener("click", () => {
+      golden.style.display = "none";
+      const bonus = Math.max(100, kekseProSekunde() * 60);
+      kekse += bonus;
+      zeigeMeldung("Goldener Keks! +" + formatiere(bonus) + " Kekse");
+      anzeigen();
+    });
+
+    function naechsterGolden() {
+      const warte = 60000 + Math.random() * 60000;
+      setTimeout(() => {
+        goldenZeigen();
+        naechsterGolden();
+      }, warte);
+    }
+    naechsterGolden();
+
+    document.getElementById("codeok").addEventListener("click", () => {
+      const eingabe = document.getElementById("codeeingabe");
+      if (eingabe.value === "Hugo2013") {
+        panel.classList.add("offen");
+        zeigeMeldung("Admin-Panel geöffnet");
+      } else {
+        zeigeMeldung("Falscher Code");
+      }
+      eingabe.value = "";
+    });
+
+    document.getElementById("a1").addEventListener("click", () => { kekse += 1000; anzeigen(); });
+    document.getElementById("a2").addEventListener("click", () => { kekse += 1000000; anzeigen(); });
+    document.getElementById("a3").addEventListener("click", () => { kekse *= 10; anzeigen(); });
+    document.getElementById("a4").addEventListener("click", () => { kekse *= 1000; anzeigen(); });
+    document.getElementById("a5").addEventListener("click", goldenZeigen);
+    document.getElementById("a6").addEventListener("click", () => {
+      const bonus = Math.max(10000, kekse * 0.5);
+      kekse += bonus;
+      zeigeMeldung("Lucky! +" + formatiere(bonus) + " Kekse");
+      anzeigen();
+    });
+    document.getElementById("a7").addEventListener("click", () => {
+      multiplikator = 10;
+      zeigeMeldung("Produktion mal 10 für 30 Sekunden");
+      setTimeout(() => { multiplikator = 1; anzeigen(); }, 30000);
+      anzeigen();
+    });
+    document.getElementById("a8").addEventListener("click", () => {
+      upgrades.forEach(u => {
+        u.anzahl += 10;
+        if (u.art === "klick") proKlick += u.wert * 10;
+      });
+      anzeigen();
+    });
+    document.getElementById("a9").addEventListener("click", () => {
+      kekse = 0;
+      proKlick = 1;
+      multiplikator = 1;
+      upgrades.forEach(u => { u.anzahl = 0; u.preis = u.startpreis; });
+      anzeigen();
+    });
+    document.getElementById("a10").addEventListener("click", () => {
+      panel.classList.remove("offen");
+    });
+
+    anzeigen();
+  </script>
+</body>
+</html>
+
+
